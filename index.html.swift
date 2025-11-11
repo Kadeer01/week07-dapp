@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Counter dApp — Sepolia</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 640px; margin:auto; }
+    button { padding:10px 14px; margin:6px; }
+    #status { margin-top: 12px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Counter dApp (Sepolia)</h1>
+
+  <div>
+    <button id="connectBtn">Connect MetaMask</button>
+    <span id="account"></span>
+  </div>
+
+  <div style="margin-top:16px;">
+    <button id="readBtn">Read Value</button>
+    <button id="incBtn">Increment</button>
+    <div id="value" style="margin-top:8px;">Value: <span id="valueSpan">—</span></div>
+  </div>
+
+  <div id="status"></div>
+
+  <!-- ethers.js v5 -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+  <script>
+    // --- REPLACE THESE with your deployed contract address and ABI from Remix ---
+    const CONTRACT_ADDRESS = "REPLACE_WITH_YOUR_CONTRACT_ADDRESS";
+    const ABI = /* REPLACE_WITH_YOUR_ABI */ [
+      {"inputs":[],"name":"decrement","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[],"name":"increment","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[],"name":"get","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
+    ];
+
+    let provider;
+    let signer;
+    let contract;
+
+    const connectBtn = document.getElementById('connectBtn');
+    const accountSpan = document.getElementById('account');
+    const status = document.getElementById('status');
+    const valueSpan = document.getElementById('valueSpan');
+    const readBtn = document.getElementById('readBtn');
+    const incBtn = document.getElementById('incBtn');
+
+    async function connect() {
+      if (!window.ethereum) {
+        status.textContent = 'MetaMask not detected in browser.';
+        return;
+      }
+      try {
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+        const account = await signer.getAddress();
+        accountSpan.textContent = account;
+        status.textContent = 'Connected to MetaMask (make sure network is Sepolia).';
+        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+      } catch (err) {
+        status.textContent = 'Connection failed: ' + err.message;
+      }
+    }
+
+    async function readValue() {
+      if (!contract) { status.textContent = 'Please connect first.'; return; }
+      try {
+        const v = await contract.get();
+        valueSpan.textContent = v.toString();
+        status.textContent = 'Read success.';
+      } catch (err) {
+        status.textContent = 'Read failed: ' + err.message;
+      }
+    }
+
+    async function increment() {
+      if (!contract) { status.textContent = 'Please connect first.'; return; }
+      try {
+        const tx = await contract.increment();
+        status.textContent = 'Transaction sent. Waiting for confirmation... (check MetaMask)';
+        await tx.wait();
+        status.textContent = 'Transaction mined. You can read the value now.';
+      } catch (err) {
+        status.textContent = 'Transaction failed: ' + err.message;
+      }
+    }
+
+    connectBtn.addEventListener('click', connect);
+    readBtn.addEventListener('click', readValue);
+    incBtn.addEventListener('click', increment);
+  </script>
+</body>
+</html>
+
