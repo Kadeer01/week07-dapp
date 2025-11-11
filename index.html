@@ -1,98 +1,159 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="tr">
 <head>
-  <meta charset="utf-8" />
-  <title>Counter dApp — Sepolia</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8">
+  <title>Counter dApp</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 640px; margin:auto; }
-    button { padding:10px 14px; margin:6px; }
-    #status { margin-top: 12px; font-weight: bold; }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f9fafb;
+      display: flex;
+      justify-content: center;
+      margin-top: 40px;
+    }
+    .container {
+      width: 500px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.05);
+    }
+    h2 {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    button {
+      margin: 5px;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .primary {
+      background-color: #2563eb;
+      color: white;
+    }
+    .disabled {
+      background-color: #ccc;
+      color: #666;
+      cursor: not-allowed;
+    }
+    .info-box {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+    .label {
+      font-weight: bold;
+    }
+    #progress {
+      height: 20px;
+      width: 100%;
+      background: #111827;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
-  <h1>Counter dApp (Sepolia)</h1>
+  <div class="container">
+    <h2>Counter dApp</h2>
 
-  <div>
-    <button id="connectBtn">Connect MetaMask</button>
-    <span id="account"></span>
+    <button id="connectButton" class="primary" onclick="connectMetamask()">MetaMask'e Bağlan</button>
+    <button id="readBtn" class="disabled" disabled>Değeri Oku</button>
+    <button id="incBtn" class="disabled" disabled>Artır</button>
+    <button id="decBtn" class="disabled" disabled>Azalt</button>
+
+    <div class="info-box">
+      <p><span class="label">Hesap:</span> <span id="account">—</span></p>
+      <p><span class="label">Ağ:</span> <span id="network">—</span></p>
+      <p><span class="label">Kontrat:</span> <span id="contractAddr">—</span></p>
+    </div>
+
+    <div class="info-box">
+      <p><span class="label">Güncel Değer:</span> <span id="counter">—</span></p>
+    </div>
+
+    <h3>Günlük</h3>
+    <div id="progress"></div>
   </div>
 
-  <div style="margin-top:16px;">
-    <button id="readBtn">Read Value</button>
-    <button id="incBtn">Increment</button>
-    <div id="value" style="margin-top:8px;">Value: <span id="valueSpan">—</span></div>
-  </div>
-
-  <div id="status"></div>
-
-  <!-- ethers.js v5 -->
-  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
   <script>
-    // --- REPLACE THESE with your deployed contract address and ABI from Remix ---
-    const CONTRACT_ADDRESS = "0x6550C5FC4e36606615A918A0426B5704b7c1e460";
-    const ABI = /* REPLACE_WITH_YOUR_ABI */ [
-      {"inputs":[],"name":"decrement","outputs":[],"stateMutability":"nonpayable","type":"function"},
-      {"inputs":[],"name":"increment","outputs":[],"stateMutability":"nonpayable","type":"function"},
-      {"inputs":[],"name":"get","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
+    const contractAddress = "0x6550C5FC4e36606615A918A0426B5704b7c1e460"; // örn: 0x1234...
+
+    const abi = [
+      {"inputs": [], "stateMutability": "nonpayable", "type": "constructor"},
+      {"inputs": [], "name": "counter", "outputs": [{"internalType": "uint256","name":"","type":"uint256"}], "stateMutability":"view","type":"function"},
+      {"inputs": [], "name": "increment", "outputs": [], "stateMutability": "nonpayable", "type": "function"},
+      {"inputs": [], "name": "decrement", "outputs": [], "stateMutability": "nonpayable", "type": "function"},
+      {"inputs": [], "name": "getCounter", "outputs": [{"internalType":"uint256","name":"","type":"uint256"}], "stateMutability":"view","type":"function"}
     ];
 
-    let provider;
-    let signer;
-    let contract;
+    let web3, contract, account;
 
-    const connectBtn = document.getElementById('connectBtn');
-    const accountSpan = document.getElementById('account');
-    const status = document.getElementById('status');
-    const valueSpan = document.getElementById('valueSpan');
-    const readBtn = document.getElementById('readBtn');
-    const incBtn = document.getElementById('incBtn');
+    async function connectMetamask() {
+      if (window.ethereum) {
+        web3 = new Web3(window.ethereum);
+        try {
+          await window.ethereum.request({ method: "eth_requestAccounts" });
+          const accounts = await web3.eth.getAccounts();
+          account = accounts[0];
+          document.getElementById("account").innerText = account;
 
-    async function connect() {
-      if (!window.ethereum) {
-        status.textContent = 'MetaMask not detected in browser.';
-        return;
-      }
-      try {
-        await window.ethereum.request({ method: 'eth_requestAccounts' });
-        provider = new ethers.providers.Web3Provider(window.ethereum);
-        signer = provider.getSigner();
-        const account = await signer.getAddress();
-        accountSpan.textContent = account;
-        status.textContent = 'Connected to MetaMask (make sure network is Sepolia).';
-        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-      } catch (err) {
-        status.textContent = 'Connection failed: ' + err.message;
+          // ✅ Sepolia ağı kontrolü (doğru yöntem)
+          const chainId = await window.ethereum.request({ method: "eth_chainId" });
+          if (chainId !== "0xaa36a7") { // 0xaa36a7 = 11155111 (Sepolia)
+            alert("⚠️ Lütfen MetaMask'ta Sepolia ağına geçin!");
+            document.getElementById("network").innerText = "Yanlış Ağ!";
+            return;
+          }
+          document.getElementById("network").innerText = "Sepolia Testnet";
+
+          contract = new web3.eth.Contract(abi, contractAddress);
+          document.getElementById("contractAddr").innerText = contractAddress;
+
+          enableButtons();
+          updateCounter();
+        } catch (err) {
+          console.error(err);
+          alert("Bağlantı reddedildi veya hata oluştu!");
+        }
+      } else {
+        alert("MetaMask yüklü değil. Lütfen yükleyin!");
       }
     }
 
-    async function readValue() {
-      if (!contract) { status.textContent = 'Please connect first.'; return; }
-      try {
-        const v = await contract.get();
-        valueSpan.textContent = v.toString();
-        status.textContent = 'Read success.';
-      } catch (err) {
-        status.textContent = 'Read failed: ' + err.message;
-      }
+    function enableButtons() {
+      ["readBtn", "incBtn", "decBtn"].forEach(id => {
+        const btn = document.getElementById(id);
+        btn.disabled = false;
+        btn.classList.remove("disabled");
+      });
+    }
+
+    async function updateCounter() {
+      const value = await contract.methods.getCounter().call();
+      document.getElementById("counter").innerText = value;
     }
 
     async function increment() {
-      if (!contract) { status.textContent = 'Please connect first.'; return; }
-      try {
-        const tx = await contract.increment();
-        status.textContent = 'Transaction sent. Waiting for confirmation... (check MetaMask)';
-        await tx.wait();
-        status.textContent = 'Transaction mined. You can read the value now.';
-      } catch (err) {
-        status.textContent = 'Transaction failed: ' + err.message;
-      }
+      await contract.methods.increment().send({ from: account });
+      updateCounter();
     }
 
-    connectBtn.addEventListener('click', connect);
-    readBtn.addEventListener('click', readValue);
-    incBtn.addEventListener('click', increment);
+    async function decrement() {
+      await contract.methods.decrement().send({ from: account });
+      updateCounter();
+    }
+
+    document.getElementById("readBtn").onclick = updateCounter;
+    document.getElementById("incBtn").onclick = increment;
+    document.getElementById("decBtn").onclick = decrement;
   </script>
 </body>
 </html>
-
